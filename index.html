@@ -1,144 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>NUS Next Bus</title>
+    <title>BUS</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script>
-        // https://nextbus.comfortdelgro.com.sg/eventservice.svc/BusStops
-        let stops = false;
-        let refresh_date = 0;
-
-        function replace_results_with(new_div) {
-            let old = document.getElementById("results");
-            document.body.removeChild(old);
-            document.body.appendChild(new_div);
-        }
-
-        function new_results_div() {
-            let div = document.createElement("div");
-            div.id = "results";
-            return div;
-        }
-
-        function populate_results(result) {
-            let lis = result.shuttles.map(function(shuttle) {
-                let str = shuttle.name + ": " + shuttle.arrivalTime + " min ("
-                    + shuttle.passengers + "), " + shuttle.nextArrivalTime + " min ("
-                    + shuttle.nextPassengers + ")";
-                let li = document.createElement("li");
-                li.innerText = str;
-                return li;
-            });
-            let h2 = document.createElement("h2");
-            h2.innerText = result.caption + " (" + result.name + ")";
-
-            let ul = document.createElement("ul");
-            for (let li of lis) {
-                ul.appendChild(li);
-            }
-
-            let span = document.createElement("span");
-            span.innerText = "Retrieved at: " + new Date()
-                .toLocaleString('en-GB', { timeZone: 'Asia/Singapore' });
-            let div = new_results_div();
-            div.appendChild(h2);
-            div.appendChild(ul);
-            div.appendChild(span);
-            replace_results_with(div);
-        }
-
-        function load_results(stop) {
-            let xhr = new XMLHttpRequest();
-            xhr.addEventListener("load", function() {
-                populate_results(JSON.parse(this.responseText).ShuttleServiceResult);
-            });
-            xhr.addEventListener("error", function() {
-                let div = new_results_div();
-                div.innerText = "Error while loading results: " + this.status + " " + this.statusText;
-                replace_results_with(div);
-            });
-            xhr.open("GET", "https://cors.io/?https://nextbus.comfortdelgro.com.sg/eventservice.svc/Shuttleservice?busstopname=" + stop);
-            xhr.send();
-        }
-
-        function select_onchange() {
-            document.getElementById("results").style = "display: none;";
-            let stop = document.getElementById("stop").value;
-            if (stop == "-1") {
-                localStorage.removeItem("nusbus");
-                location.reload();
-            } else if (stop !== "") {
-                load_results(stop);
-            }
-        }
-
-        function create_option(text, value) {
-            let option = document.createElement("option");
-            option.value = value;
-            option.innerText = text;
-            return option;
-        }
-
-        function create_refresh() {
-            let divider = create_option("---", "");
-            divider.disabled = true;
-            let refresh = create_option("Refresh (Last refresh: " +
-                        new Date(refresh_date)
-                            .toLocaleString('en-GB', { timeZone: 'Asia/Singapore' }) +
-                        ")", -1);
-            return [divider, refresh];
-        }
-
-        function populate_select() {
-            let options = [create_option("Select a stop", "")]
-                .concat(stops.map(stop =>
-                    create_option(stop.caption + " (" + stop.name + ")",
-                        stop.name)))
-                .concat(create_refresh());
-
-            let old_select = document.getElementById("stop");
-            let new_select = old_select.cloneNode(false);
-            for (let option of options) {
-                new_select.appendChild(option);
-            }
-            new_select.disabled = false;
-            new_select.value = old_select.value;
-            new_select.onchange = select_onchange;
-            old_select.parentNode.replaceChild(new_select, old_select);
-        }
-
-        function refresh_stops() {
-            let stored = JSON.parse(localStorage.getItem("nusbus"));
-            if (!stored || (Date.now() - stored.date) > 302400000 /* 3.5 days */) {
-                let xhr = new XMLHttpRequest();
-                xhr.addEventListener("load", function() {
-                    let new_stops = JSON.parse(this.responseText).BusStopsResult.busstops;
-                    let new_refresh_date = Date.now();
-                    localStorage.setItem("nusbus", JSON.stringify({
-                        'date': new_refresh_date,
-                        'stops': new_stops
-                    }));
-
-                    stops = new_stops;
-                    refresh_date = new_refresh_date;
-                    populate_select();
-
-                });
-                xhr.addEventListener("error", populate_select);
-                xhr.open("GET", "https://cors.io/?https://nextbus.comfortdelgro.com.sg/eventservice.svc/BusStops");
-                xhr.send();
-            } else {
-                stops = stored.stops;
-                refresh_date = stored.date;
-                populate_select();
-            }
-        }
-
-        window.onload = function() {
-            refresh_stops();
-        };
-    </script>
     <style>
         #stop, #refresh {
             width: 100%;
@@ -155,15 +20,110 @@
     </style>
 </head>
 <body>
-    <div>
-        <select id="stop" disabled="disabled">
-            <option value="">Loading...</option>
-        </select>
-    </div>
-    <div>
-        <button id="refresh" onclick="select_onchange();">Refresh</button>
-    </div>
-    <div id="results">
-    </div>
+<div>
+    <label for="stop"></label><select id="stop" disabled="disabled">
+    <option value="">Loading...</option>
+</select>
+</div>
+<div>
+    <button id="refresh" onclick="select_onchange();">Refresh</button>
+</div>
+<div id="results">
+</div>
+<script>
+    // https://nextbus.comfortdelgro.com.sg/eventservice.svc/BusStops
+    let stops = false;
+    let refresh_date = 0;
+    
+    const get_by_id = document.getElementById.bind(document);
+
+    function create(tag, properties = {}, ...children) {
+        const element = document.createElement(tag);
+        for (const [key, value] of Object.entries(properties)) {
+            element[key] = value
+        }
+        children.forEach(element.appendChild, element);
+        return element
+    }
+
+    function replace_results_with(new_div) {
+        get_by_id("results").replaceWith(new_div);
+    }
+
+    function format_date(date) {
+        return new Date(date).toLocaleString('en-GB', {timeZone: 'Asia/Singapore'});
+    }
+
+    function populate_results(result) {
+        const lis = result.shuttles.map(({name, arrivalTime, passengers, nextArrivalTime, nextPassengers}) =>
+            create("li", {innerText: `${name}: ${arrivalTime} min (${passengers}), ${nextArrivalTime} min (${nextPassengers})`}));
+        const h2 = create("h2", {innerText: `${result.caption} (${result.name})`});
+        const ul = create("ul", {}, ...lis);
+        const retrievedText = `Retrieved at: ${format_date(new Date())}`;
+        const span = create("span", {innerText: retrievedText});
+        get_by_id("results").replaceWith(create("div", {id: "results"}, h2, ul, span));
+    }
+
+    function load_results(stop) {
+        fetch("https://cors.io/?https://nextbus.comfortdelgro.com.sg/eventservice.svc/Shuttleservice?busstopname=" + stop)
+            .then(response => response.json())
+            .then(json => populate_results(json.ShuttleServiceResult))
+            .catch(error => replace_results_with(create("div", {innerText: `Error while loading results. Please try again.`})));
+    }
+
+    function select_onchange(event) {
+        get_by_id("results").style.display = "none;";
+        let stop = event.target.value;
+        if (stop === "-1") {
+            localStorage.removeItem("nusbus");
+            location.reload();
+        } else if (stop !== "") {
+            load_results(stop);
+        }
+    }
+
+    function create_refresh() {
+        const divider = new Option("---", "", undefined, true);
+        divider.disabled = true;
+        const refresh = new Option(`Refresh (Last refresh: ${format_date(refresh_date)})`, "-1");
+        return [divider, refresh];
+    }
+
+    function populate_select() {
+        const stops_as_options = stops.map(({caption, name}) =>
+            new Option(`${caption} (${name})`,
+                name));
+        const options = [new Option("Select a stop", "")]
+            .concat(stops_as_options)
+            .concat(create_refresh());
+        const new_select = create("select", {id: "stop", onchange: select_onchange}, ...options);
+        get_by_id("stop").replaceWith(new_select);
+    }
+
+    function refresh_stops() {
+        const stored = JSON.parse(localStorage.getItem("nusbus"));
+        const ms_day = 24 * 60 * 60 * 1000;
+        const ms_three_and_half_days = ms_day * 3.5;
+        if (!stored || (Date.now() - stored.date) > ms_three_and_half_days) {
+            fetch('https://cors.io/?https://nextbus.comfortdelgro.com.sg/eventservice.svc/BusStops')
+                .then(response => response.json())
+                .then(({BusStopsResult: {busstops}}) => {
+                    refresh_date = Date.now();
+                    localStorage.setItem("nusbus", JSON.stringify({
+                        'refresh_date': refresh_date,
+                        'stops': busstops
+                    }));
+                    stops = busstops;
+                    populate_select();
+                })
+                .catch(console.log);
+        } else {
+            ({stops, refresh_date} = stored);
+            populate_select();
+        }
+    }
+
+    refresh_stops();
+</script>
 </body>
 </html>
